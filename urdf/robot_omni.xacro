@@ -1,0 +1,100 @@
+<?xml version="1.0"?>
+<robot name="mecanum" xmlns:xacro="http://www.ros.org/wiki/xacro">
+
+  <xacro:include filename="$(find semantic_map_slam)/urdf/robot_omni.gazebo" />
+  <xacro:include filename="$(find semantic_map_slam)/urdf/materials.xacro" />
+  <xacro:include filename="$(find semantic_map_slam)/urdf/inertial.xacro" />
+  <xacro:include filename="$(find semantic_map_slam)/urdf/wheel_joint.xacro" />
+  <xacro:include filename="$(find semantic_map_slam)/urdf/base_half.xacro" />
+  <xacro:include filename="$(find semantic_map_slam)/urdf/wheel_link.xacro" />
+  <xacro:include filename="$(find semantic_map_slam)/urdf/sensor_joint.xacro" />
+
+  <xacro:property name="base_width" value="0.3683" />
+  <xacro:property name="base_length" value="0.3683" />
+  <xacro:property name="base_height" value="0.0635" />
+  <xacro:property name="wheel_rad" value="0.1016" />
+  <xacro:property name="wheel_width" value="0.0762" />
+  <xacro:property name="wheel_gap" value="0.0508" />
+  <xacro:property name="wheel_setback" value="0.041275" />
+  <xacro:property name="sensor_width" value="0.0508" />
+  <xacro:property name="sensor_length" value="0.0508" />
+  <xacro:property name="sensor_height" value="0.0762" />
+
+
+  <!--~~~~~~~~~~~~~~~~~~~~~~~~ ~ BASE ~ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~-->
+  <xacro:base_half name="base_front" x="${0.3*base_length}" material="orange"/>
+  <xacro:base_half name="base_rear" x="${-0.3*base_length}" material="orange"/>
+
+
+  <!--~~~~~~~~~~~~~~~~~~~~~~~~ ~ WHEELS ~ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~-->
+  <xacro:wheel_link name="fl_link" mesh_file="package://semantic_map_slam/urdf/Left_wheel.stl" xyz="0 -0.38 0" rpy="${pi/2} 0.0 0.0" />
+  <xacro:wheel_link name="fr_link" mesh_file="package://semantic_map_slam/urdf/Right_wheel.stl" xyz="0 0 0" rpy="${pi/2} 0 0" />
+  <xacro:wheel_link name="bl_link" mesh_file="package://semantic_map_slam/urdf/Right_wheel.stl" xyz="0 0 0" rpy="${pi/2} 0 0" />
+  <xacro:wheel_link name="br_link" mesh_file="package://semantic_map_slam/urdf/Left_wheel.stl" xyz="0 -0.38 0" rpy="${pi/2} 0 0" />
+
+  
+  <!--~~~~~~~~~~~~~~~~~~~~~~~ ~ Sensors ~ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~-->
+  <link name='camera'>
+    <visual name='camera_visual'>
+      <origin xyz="0 0 0" rpy=" 0 0 0"/>
+      <geometry>
+        <box size="${sensor_length} ${sensor_width} ${sensor_height}"/>
+      </geometry>
+      <material name="red"/>
+    </visual>
+  </link>
+
+  <link name="lidar">
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry>
+        <box size="${sensor_length} ${sensor_width} ${sensor_height}"/>
+      </geometry>
+      <material name="black"/>
+    </visual>
+  </link>
+
+
+  <!--~~~~~~~~~~~~~~~~~~~~~~~ ~ Joints ~ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~-->
+  <xacro:wheel_joint name="fl_joint" 
+                     parent_link="base_front" 
+                     child_link="fl_link"
+                     xyz="${base_length/2 - wheel_setback} ${base_width/2 + wheel_gap} 0.0"/>
+                     
+  <xacro:wheel_joint name="fr_joint"
+                     parent_link="base_front"
+                     child_link="fr_link"
+                     xyz="${base_length/2 - wheel_setback} ${-base_width/2 - wheel_gap} 0.0"/>
+
+  <xacro:wheel_joint name="bl_joint"
+                     parent_link="base_rear"
+                     child_link="bl_link"
+                     xyz="${-base_length/2 + wheel_setback} ${base_width/2 + wheel_gap} 0.0"/>
+
+  <xacro:wheel_joint name="br_joint"
+                     parent_link="base_rear"
+                     child_link="br_link"
+                     xyz="${-base_length/2 + wheel_setback} ${-base_width/2 - wheel_gap} 0.0"/>
+
+  <joint name="base_halves_joint" type="continuous">
+    <parent link="base_front"/>
+    <child link="base_rear"/>
+    <origin xyz="0 0 0" rpy="0 0 0"/>
+    <axis xyz="1 0 0"/>
+    <dynamics damping="0.5" friction="0.1"/>
+    <limit effort="10" velocity="1.0"/>
+  </joint>
+
+  <xacro:sensor_joint name="camera_joint"
+                      parent_link="base_front"
+                      child_link="camera"
+                      xyz="${base_length/2} ${sensor_width} ${sensor_height/2}" 
+                      rpy="0 0 0"/>
+
+  <xacro:sensor_joint name="lidar_joint"
+                      parent_link="base_front"
+                      child_link="lidar"
+                      xyz="${base_length/2} ${-sensor_width} ${sensor_height/2}" 
+                      rpy="0 0 0"/>
+
+</robot>

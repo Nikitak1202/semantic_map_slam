@@ -1,0 +1,38 @@
+<?xml version='1.0'?>
+<launch>
+  <arg name="gazebo_gui" default="true"/>
+  <arg name="rviz_gui" default="false"/>
+
+  <param name="robot_description" command="$(find xacro)/xacro --inorder '$(find semantic_map_slam)/urdf/robot_omni.xacro'" />
+
+  <!-- <node name="joint_state_publisher_gui" pkg="joint_state_publisher_gui" type="joint_state_publisher_gui" /> -->
+    <node name="robot_state_publisher" pkg="robot_state_publisher" type="robot_state_publisher"
+    respawn="false" output="screen">
+    <remap from="/joint_states" to="/omni_control/joint_states" />
+  </node>
+
+  <rosparam file="$(find semantic_map_slam)/config/omni_control.yaml" command="load"/>
+
+  <include file="$(find gazebo_ros)/launch/empty_world.launch">
+    <arg name="world_name" value="$(find semantic_map_slam)/worlds/room.world"/>
+    <arg name="paused" value="false"/>
+    <arg name="use_sim_time" value="true"/>
+    <arg name="gui" value="$(arg gazebo_gui)"/>
+    <arg name="debug" value="false"/>
+  </include>
+
+  <node name="semantic_map_slam_spawn" pkg="gazebo_ros" type="spawn_model" output="screen"
+        args="-urdf -param robot_description -model robot -x 1.0 -y 7.6 -z 0.1 -Y -1.57" />
+
+  <node name="controller_spawner" pkg="controller_manager" type="spawner" respawn="false"
+        output="screen" ns="/omni_control"
+        args="front_right_wheel_joint front_left_wheel_joint back_left_wheel_joint back_right_wheel_joint joint_state_controller"/>
+
+  <!-- Node for cmd_vel subscription -->
+  <node name="move_node" pkg="semantic_map_slam" type="move.py"></node>
+
+  <group if="$(eval arg('rviz_gui') == true)">
+    <node name="scene_rviz" pkg="rviz" type="rviz" args="-d $(find semantic_map_slam)/config/scene.rviz" required="true" />
+  </group>
+
+</launch>
