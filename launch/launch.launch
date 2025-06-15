@@ -22,14 +22,17 @@
   </include>
 
   <node name="semantic_map_slam_spawn" pkg="gazebo_ros" type="spawn_model" output="screen"
-        args="-urdf -param robot_description -model robot -x 1.0 -y 7.6 -z 0.1 -Y -1.57" />
+        args="-urdf -param robot_description -model robot -x 0 -y 2 -z 0.1 -Y -1.57" />
 
   <node name="controller_spawner" pkg="controller_manager" type="spawner" respawn="false"
         output="screen" ns="/omni_control"
-        args="front_right_wheel_joint front_left_wheel_joint back_left_wheel_joint back_right_wheel_joint joint_state_controller"/>
+        args="base_halves_joint front_right_wheel_joint front_left_wheel_joint back_left_wheel_joint back_right_wheel_joint joint_state_controller"/>
 
   <!-- Node for cmd_vel subscription -->
   <node name="move_node" pkg="semantic_map_slam" type="move.py"></node>
+
+  <!-- Constant forward publisher (Twist cmd) -->
+  <!--<node name="forward_pub" pkg="semantic_map_slam" type="forward_publisher.py"/>-->
 
   <group if="$(eval arg('rviz_gui') == true)">
     <node name="scene_rviz" pkg="rviz" type="rviz" args="-d $(find semantic_map_slam)/config/scene.rviz" required="true" />

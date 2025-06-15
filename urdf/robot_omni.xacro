@@ -44,7 +44,7 @@
     </visual>
   </link>
 
-  <link name="lidar">
+  <link name="laser">
     <visual>
       <origin xyz="0 0 0" rpy="0 0 0"/>
       <geometry>
@@ -76,6 +76,7 @@
                      child_link="br_link"
                      xyz="${-base_length/2 + wheel_setback} ${-base_width/2 - wheel_gap} 0.0"/>
 
+
   <joint name="base_halves_joint" type="continuous">
     <parent link="base_front"/>
     <child link="base_rear"/>
@@ -84,17 +85,29 @@
     <dynamics damping="0.5" friction="0.1"/>
     <limit effort="10" velocity="1.0"/>
   </joint>
+  
+  <transmission name="base_halves_state">
+    <type>transmission_interface/SimpleTransmission</type>
+    <joint name="base_halves_joint">
+      <hardwareInterface>hardware_interface/VelocityJointInterface</hardwareInterface>
+    </joint>
+    <actuator name="chassis">
+      <hardwareInterface>hardware_interface/VelocityJointInterface</hardwareInterface>
+      <mechanicalReduction>1</mechanicalReduction>
+    </actuator>
+  </transmission>
+
 
   <xacro:sensor_joint name="camera_joint"
                       parent_link="base_front"
                       child_link="camera"
-                      xyz="${base_length/2} ${sensor_width} ${sensor_height/2}" 
+                      xyz="${base_length/2} 0 ${sensor_height}" 
                       rpy="0 0 0"/>
 
-  <xacro:sensor_joint name="lidar_joint"
+  <xacro:sensor_joint name="laser_joint"
                       parent_link="base_front"
-                      child_link="lidar"
-                      xyz="${base_length/2} ${-sensor_width} ${sensor_height/2}" 
+                      child_link="laser"
+                      xyz="${base_length/2} 0 ${2*sensor_height}" 
                       rpy="0 0 0"/>
 
 </robot>
