@@ -1,41 +1,85 @@
-<?xml version='1.0'?>
+<?xml version="1.0"?>
 <launch>
+
+  <!-- GUI configuration: enable/disable Gazebo and RViz -->
   <arg name="gazebo_gui" default="true"/>
-  <arg name="rviz_gui" default="false"/>
+  <arg name="rviz_gui"   default="true"/>
+  
+  <!-- Load robot description -->
+  <param name="robot_description"
+         command="$(find xacro)/xacro --inorder '$(find semantic_map_slam)/urdf/robot_omni.xacro'" />
 
-  <param name="robot_description" command="$(find xacro)/xacro --inorder '$(find semantic_map_slam)/urdf/robot_omni.xacro'" />
-
-  <!-- <node name="joint_state_publisher_gui" pkg="joint_state_publisher_gui" type="joint_state_publisher_gui" /> -->
-    <node name="robot_state_publisher" pkg="robot_state_publisher" type="robot_state_publisher"
-    respawn="false" output="screen">
-    <remap from="/joint_states" to="/omni_control/joint_states" />
+  <!-- Publish TFs based on incoming joint_states -->
+  <node name="robot_state_publisher"
+        pkg="robot_state_publisher" type="robot_state_publisher"
+        respawn="false" output="screen">
+    <remap from="/joint_states" to="/omni_control/joint_states"/>
   </node>
 
+  <!-- Load ROS-control parameters for velocity controllers -->
   <rosparam file="$(find semantic_map_slam)/config/omni_control.yaml" command="load"/>
 
+  <!-- Launch an empty Gazebo world defined in the package -->
   <include file="$(find gazebo_ros)/launch/empty_world.launch">
-    <arg name="world_name" value="$(find semantic_map_slam)/worlds/room.world"/>
-    <arg name="paused" value="false"/>
+    <arg name="world_name"   value="$(find semantic_map_slam)/worlds/room.world"/>
+    <arg name="paused"       value="false"/>
     <arg name="use_sim_time" value="true"/>
-    <arg name="gui" value="$(arg gazebo_gui)"/>
-    <arg name="debug" value="false"/>
+    <arg name="gui"          value="$(arg gazebo_gui)"/>
+    <arg name="debug"        value="false"/>
   </include>
 
-  <node name="semantic_map_slam_spawn" pkg="gazebo_ros" type="spawn_model" output="screen"
-        args="-urdf -param robot_description -model robot -x 0 -y 2 -z 0.1 -Y -1.57" />
+  <!-- Spawn the robot model into the Gazebo simulation -->
+  <node name="semantic_map_slam_spawn" pkg="gazebo_ros" type="spawn_model"
+        output="screen"
+        args="-urdf -param robot_description -model robot -x 0 -y 2 -z 0.1 -Y -1.57"/>
 
-  <node name="controller_spawner" pkg="controller_manager" type="spawner" respawn="false"
-        output="screen" ns="/omni_control"
+  <!-- Start up the ROS-control controller manager with our joints -->
+  <node name="controller_spawner" pkg="controller_manager" type="spawner"
+        respawn="false" output="screen" ns="/omni_control"
         args="base_halves_joint front_right_wheel_joint front_left_wheel_joint back_left_wheel_joint back_right_wheel_joint joint_state_controller"/>
 
-  <!-- Node for cmd_vel subscription -->
-  <node name="move_node" pkg="semantic_map_slam" type="move.py"></node>
+  <!-- Node handling velocity commands and converting to wheel speeds -->
+  <node name="move_node" pkg="semantic_map_slam" type="move.py"/>
 
-  <!-- Constant forward publisher (Twist cmd) -->
-  <!--<node name="forward_pub" pkg="semantic_map_slam" type="forward_publisher.py"/>-->
+  <!-- Static transform from robot base to laser frame -->
+  <node pkg="tf2_ros" type="static_transform_publisher" name="laser_static_tf"
+        args="0 0 0 0 0 0 base_front laser"/>
 
+  <!-- Static odometry frame placeholder (map → odom → base) -->
+  <node pkg="tf2_ros" type="static_transform_publisher" name="odom_static_tf"
+        args="0 0 0 0 0 0 odom base_front"/>
+
+  <!-- Hector SLAM node: builds occupancy grid from laser scans -->
+  <node pkg="hector_mapping" type="hector_mapping" name="hector_mapping" output="screen">
+
+    <!-- Coordinate frame names -->
+    <param name="map_frame"  value="map"/>
+    <param name="odom_frame" value="odom"/>        
+    <param name="base_frame" value="base_front"/>  
+
+    <!-- Map configuration -->
+    <param name="map_resolution"         value="0.05"/>
+    <param name="map_size"               value="1024"/>
+    <param name="map_start_x"            value="0.5"/>
+    <param name="map_start_y"            value="0.5"/>
+    <param name="map_multi_res_levels"   value="2"/>
+
+    <!-- Update factors and thresholds -->
+    <param name="update_factor_free"         value="0.4"/>
+    <param name="update_factor_occupied"     value="0.9"/>
+    <param name="map_update_distance_thresh" value="0.4"/>
+    <param name="map_update_angle_thresh"    value="0.06"/>
+    <param name="laser_z_min_value"          value="-1.0"/>
+    <param name="laser_z_max_value"          value="1.0"/>
+
+    <!-- Laser scan topic -->
+    <param name="scan_topic" value="scan"/>
+  </node>
+
+  <!-- Conditionally launch RViz for map and TF visualization -->
   <group if="$(eval arg('rviz_gui') == true)">
-    <node name="scene_rviz" pkg="rviz" type="rviz" args="-d $(find semantic_map_slam)/config/scene.rviz" required="true" />
+    <node name="scene_rviz" pkg="rviz" type="rviz"
+          args="-d $(find semantic_map_slam)/config/scene.rviz"
+          required="true"/>
   </group>
-
 </launch>
