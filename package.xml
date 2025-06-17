@@ -16,14 +16,21 @@
   <depend>controller_manager</depend>
   <depend>joint_state_controller</depend>
   <depend>robot_state_publisher</depend>
+  <depend>message_runtime</depend>
+  <depend>message_generation</depend>
+  <depend>tf2_ros</depend>
+  <depend>vision_msgs</depend>
+  <depend>nav_msgs</depend>    
+  <depend>darknet_ros</depend>          <!-- YOLO wrapper -->
+  <depend>cv_bridge</depend>
+  <depend>image_transport</depend>
+  <depend>sensor_msgs</depend>
 
-  <exec_depend>rospy</exec_depend>
+  <build_depend>rospy</build_depend>
+  <build_export_depend>rospy</build_export_depend>
 
   <!-- The export tag contains other, unspecified, tags -->
   <export>
     <!-- Other tools can request additional information be placed here -->
-
-
-
   </export>
 </package>

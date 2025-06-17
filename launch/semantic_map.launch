@@ -1,0 +1,22 @@
+<launch>
+  <!-- === 1. Run the existing world / robot / SLAM stack ============ -->
+  <include file="$(find semantic_map_slam)/launch/slam.launch">
+    <arg name="gazebo_gui" value="false"/>
+    <arg name="rviz_gui"   value="true"/>
+  </include>
+
+  <!-- === 2. Start YOLO (darknet_ros) ================================ -->
+  <node name="darknet_ros" pkg="darknet_ros" type="darknet_ros" output="screen">
+  </node>
+
+  <!-- === 3. Run the semantic‐mapper node ============================ -->
+  <node name="semantic_mapper"
+        pkg="semantic_map_slam" type="semantic_mapper.py"
+        output="screen">
+    <param name="base_frame"   value="base_front"/>
+    <param name="camera_frame" value="camera"/>
+    <param name="map_topic"    value="/map"/>
+    <param name="det_topic"    value="/darknet_ros/detections"/>
+    <param name="out_topic"    value="/semantic_grid"/>
+  </node>
+</launch>

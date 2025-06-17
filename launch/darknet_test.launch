@@ -1,0 +1,24 @@
+<?xml version="1.0"?>
+<launch>
+
+  <!-- ─── пользовательский аргумент: путь к тестовой картинке ────────── -->
+  <arg name="image_path" default="$(find semantic_map_slam)/Untitled.jpeg"/>
+
+  <!-- ─── загружаем параметры сети YOLO (cfg + weights + классы) ──────── -->
+  <rosparam command="load"
+            file="$(find darknet_ros)/config/yolov2-tiny.yaml"/>
+
+  <!-- ─── публикуем одиночное изображение в topic /head/camera/image_raw -->
+  <!--     image_publisher читает файл с диска и шлёт его как sensor_msgs/Image -->
+  <node pkg="image_publisher" type="image_publisher"
+        name="static_image_pub" output="screen">
+    <param name="~image" value="$(arg image_path)"/>
+    <!-- важный ремэп: в darknet_ros.yaml subscriber ждёт /head/camera/image_raw -->
+    <remap from="image" to="/head/camera/image_raw"/>
+  </node>
+
+  <!-- ─── сам детектор YOLO  (darknet_ros) ───────────────────────────── -->
+  <!--     запускаем стандартный launch, где уже настроены топики         -->
+  <include file="$(find darknet_ros)/launch/darknet_ros.launch"/>
+
+</launch>
