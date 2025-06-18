@@ -76,6 +76,13 @@
     <param name="scan_topic" value="scan"/>
   </node>
 
+  <!-- Keyboard teleop (cmd_vel)  -->
+  <node pkg="teleop_twist_keyboard" type="teleop_twist_keyboard.py"
+        name="teleop_keyboard" output="screen" args="cmd_vel:=/cmd_vel">
+    <!-- avoid accidental startup until you hit a key -->
+    <param name="repeat_rate" value="10.0"/>
+  </node>
+
   <!-- Conditionally launch RViz for map and TF visualization -->
   <group if="$(eval arg('rviz_gui') == true)">
     <node name="scene_rviz" pkg="rviz" type="rviz"

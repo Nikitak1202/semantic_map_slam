@@ -5,9 +5,15 @@
     <arg name="rviz_gui"   value="true"/>
   </include>
 
-  <!-- === 2. Start YOLO (darknet_ros) ================================ -->
-  <node name="darknet_ros" pkg="darknet_ros" type="darknet_ros" output="screen">
-  </node>
+  <!-- === 2. Start YOLO (darknet_ros) with correct params ============== -->
+  <include file="$(find darknet_ros)/launch/darknet_ros.launch">
+    <!-- где взять картинку из Gazebo-камеры -->
+    <arg name="image"           value="/head/camera/image_raw" />
+    <!-- какой сетевой конфиг / веса использовать -->
+    <arg name="network_param_file"
+        value="$(find darknet_ros)/config/yolov2.yaml" />
+  </include>
+
 
   <!-- === 3. Run the semantic‐mapper node ============================ -->
   <node name="semantic_mapper"
