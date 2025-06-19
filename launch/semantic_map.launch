@@ -1,28 +1,27 @@
 <launch>
-  <!-- === 1. Run the existing world / robot / SLAM stack ============ -->
+  <!-- === Run the existing world / robot / SLAM stack ============ -->
   <include file="$(find semantic_map_slam)/launch/slam.launch">
     <arg name="gazebo_gui" value="false"/>
     <arg name="rviz_gui"   value="true"/>
   </include>
 
-  <!-- === 2. Start YOLO (darknet_ros) with correct params ============== -->
+  <!-- === Start YOLO (darknet_ros) ============== -->
   <include file="$(find darknet_ros)/launch/darknet_ros.launch">
-    <!-- где взять картинку из Gazebo-камеры -->
+    <!-- Image source -->
     <arg name="image"           value="/head/camera/image_raw" />
-    <!-- какой сетевой конфиг / веса использовать -->
+    <!-- Model choice -->
     <arg name="network_param_file"
-        value="$(find darknet_ros)/config/yolov2.yaml" />
+        value="$(find darknet_ros)/config/yolov3.yaml" />
   </include>
 
-
-  <!-- === 3. Run the semantic‐mapper node ============================ -->
+  <!-- === Run the semantic‐mapper node ============================ -->
   <node name="semantic_mapper"
         pkg="semantic_map_slam" type="semantic_mapper.py"
         output="screen">
     <param name="base_frame"   value="base_front"/>
     <param name="camera_frame" value="camera"/>
     <param name="map_topic"    value="/map"/>
-    <param name="det_topic"    value="/darknet_ros/detections"/>
+    <param name="det_topic"    value="/detections_2d"/>
     <param name="out_topic"    value="/semantic_grid"/>
   </node>
 </launch>
