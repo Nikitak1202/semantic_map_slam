@@ -11,7 +11,7 @@
     <arg name="image"           value="/head/camera/image_raw" />
     <!-- Model choice -->
     <arg name="network_param_file"
-        value="$(find darknet_ros)/config/yolov3.yaml" />
+        value="$(find darknet_ros)/config/yolov2-tiny.yaml" />
   </include>
 
   <!-- === Run the semantic‐mapper node ============================ -->

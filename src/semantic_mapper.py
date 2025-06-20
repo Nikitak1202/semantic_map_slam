@@ -16,21 +16,32 @@ import tf2_ros
 import tf2_geometry_msgs
 
 from darknet_ros_msgs.msg import BoundingBoxes
-from sensor_msgs.msg import LaserScan
+from sensor_msgs.msg import LaserScan, CameraInfo
 from nav_msgs.msg  import OccupancyGrid
 from geometry_msgs.msg import PointStamped
 from visualization_msgs.msg import Marker, MarkerArray
 
-# ----- user-tunable ----------------------------------------------------------
+# ---------- user-tunable -----------------------------------------------------
 SUPPORTED_CLASSES = ["chair", "refrigerator", "sofa"]
-COLORS = {  # RGBA
-    "chair"        : (0.2, 0.6, 1.0, 0.9),
-    "refrigerator" : (1.0, 1.0, 1.0, 0.9),
-    "sofa"         : (0.9, 0.3, 0.3, 0.9),
+
+COLORS = {          #  R,   G,   B,   A
+    "chair"        : (0.10, 0.80, 0.10, 0.85),
+    "refrigerator" : (0.10, 0.10, 0.80, 0.85),
+    "sofa"         : (0.80, 0.10, 0.10, 0.85),
 }
-MARKER_SCALE = 0.3                # [m] cube edge
-CAMERA_FOV   = math.radians(90)   # horizontal FoV of the darknet camera
-CAMERA_FRAME = "base_front"       # where the camera lives
+SIZE_M = {  # cube edge length [m]
+    "chair"        : 0.45,
+    "refrigerator" : 0.60,
+    "sofa"         : 0.75,
+}
+
+MARKER_LIFETIME = 0.0           # 0 ⇒ keep forever
+CAMERA_FRAME    = "base_front"       # where the camera lives
+
+# ---- NEW: how “central” a detection must be to count -----------------------
+# expressed as fraction of the half–image-width (0.0 … 1.0)
+CENTER_TOLERANCE = 0.5     # 0.10 ⇒ accept if bbox centre is within ±10 % of
+                            #         the image centre.  Lower = stricter.
 # -----------------------------------------------------------------------------
 
 
@@ -59,9 +70,32 @@ class SemanticMapper:
         # keep only the most recent detections to avoid flooding markers
         self.history = {cls: deque(maxlen=20) for cls in SUPPORTED_CLASSES}
 
+        # camera info
+        self._init_camera_info()    # subscribe to CameraInfo
+
         rospy.loginfo("semantic_mapper ready")
 
-    # ---------------------------------------------------------------------
+    # ---------------------------------------------------------------------------
+    #  CameraInfo handling — paste this right after __init__()
+    # ---------------------------------------------------------------------------
+    def _init_camera_info(self):
+        """Subscribe once to CameraInfo, grab width and HFOV."""
+        self.img_w  = 640            # fallback until we hear CameraInfo
+        self.hfov   = math.radians(90)  # fallback HFOV in radians
+
+        self.caminfo_sub = rospy.Subscriber("/head/camera/camera_info", CameraInfo,
+                        self.cb_caminfo, queue_size=1)
+
+    def cb_caminfo(self, msg):
+        """Store real image width and horizontal FoV."""
+        self.img_w = msg.width
+        fx         = msg.K[0]        # focal length (pixels)
+        if fx > 0:
+            self.hfov = 2.0 * math.atan2(0.5 * self.img_w, fx)
+        # unsubscribe – we only need one message
+        rospy.loginfo_once(f"Camera info: width={self.img_w}, hfov={math.degrees(self.hfov):.1f}°")
+        self.caminfo_sub.unregister()
+
 
     def cb_map(self, msg):
         self.map_frame = msg.header.frame_id or "map"
@@ -72,12 +106,12 @@ class SemanticMapper:
     def cb_boxes(self, msg):
         """
         Handle a darknet_ros BoundingBoxes message:
-        turn every recognised object into a map-frame Marker.
+        turn every *central* detection into a map-frame Marker.
         """
         if self.latest_scan is None:
-            return                      # not yet ready
+            return                      # waiting for first /scan
 
-        img_w      = 640
+        self.img_w      = 640                          # darknet default
         angle_inc  = self.latest_scan.angle_increment
         angle_min  = self.latest_scan.angle_min
 
@@ -89,12 +123,19 @@ class SemanticMapper:
             if cls not in SUPPORTED_CLASSES:
                 continue
 
-            # 1. camera pixel  ➜  bearing angle
-            x_mid   = 0.5 * (box.xmin + box.xmax)
-            rel     = (x_mid - img_w / 2.0) / img_w          # -0.5 … +0.5
-            theta   = rel * CAMERA_FOV
+            # ------------------------------------------------------------------
+            # 1.  Centre-of-bbox must be close enough to centre of the image
+            # ------------------------------------------------------------------
+            x_mid = 0.5 * (box.xmin + box.xmax)      # [px]
+            offset_px = abs(x_mid - self.img_w / 2.0)     # distance from centre [px]
+            if offset_px > CENTER_TOLERANCE * (self.img_w / 2.0):
+                continue            # too far from centre ⇒ skip this detection
 
-            # 2. pick closest laser ray
+            # 2.  Convert pixel offset ► bearing angle in CAMERA_FRAME
+            rel   = (x_mid - self.img_w / 2.0) / self.img_w     # -0.5 … +0.5
+            theta = rel * self.hfov
+
+            # 3.  Pick the nearest laser ray
             idx = int(round((theta - angle_min) / angle_inc))
             if not (0 <= idx < len(self.latest_scan.ranges)):
                 continue
@@ -102,7 +143,7 @@ class SemanticMapper:
             if not math.isfinite(rng):
                 continue
 
-            # 3. build a point in CAMERA_FRAME (== base_front)
+            # 4.  Build point in CAMERA_FRAME
             pt_cam              = PointStamped()
             pt_cam.header.stamp = self.latest_scan.header.stamp
             pt_cam.header.frame_id = CAMERA_FRAME
@@ -110,23 +151,19 @@ class SemanticMapper:
             pt_cam.point.y = rng * math.sin(theta)
             pt_cam.point.z = 0.0
 
-            # 4. transform to MAP using the **newest available** TF
-            pt_cam.header.stamp = rospy.Time(0)          # 0 = latest transform
+            # 5.  Transform to MAP (latest available transform)
+            pt_cam.header.stamp = rospy.Time(0)
             try:
                 pt_map = self.tf_buffer.transform(
-                    pt_cam,               # message to transform
-                    self.map_frame,       # target frame  ("/map")
-                    rospy.Duration(0.2))  # wait max 0.2 s
+                    pt_cam, self.map_frame, rospy.Duration(0.2))
             except (tf2_ros.LookupException,
                     tf2_ros.ExtrapolationException,
                     tf2_ros.ConnectivityException):
                 rospy.logwarn_throttle(
-                    2.0,
-                    f"TF map←{CAMERA_FRAME} unavailable – skipping {cls}")
+                    2.0, f"TF map←{CAMERA_FRAME} unavailable – skipping {cls}")
                 continue
 
-
-            # 5. cook & add marker
+            # 6.  Create & append marker
             marker = self.make_marker(cls, pt_map.point, stamp_now)
             marker_array.markers.append(marker)
 

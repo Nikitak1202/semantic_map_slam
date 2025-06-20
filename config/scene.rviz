@@ -3,8 +3,7 @@ Panels:
     Help Height: 0
     Name: Displays
     Property Tree Widget:
-      Expanded:
-        - /MarkerArray1
+      Expanded: ~
       Splitter Ratio: 0.3454935550689697
     Tree Height: 516
   - Class: rviz/Selection
@@ -214,14 +213,14 @@ Visualization Manager:
       Marker Topic: /semantic_map_markers
       Name: MarkerArray
       Namespaces:
-        chair: true
+        {}
       Queue Size: 100
       Value: true
   Enabled: true
   Global Options:
     Background Color: 48; 48; 48
     Default Light: true
-    Fixed Frame: base_front
+    Fixed Frame: map
     Frame Rate: 30
   Name: root
   Tools:
