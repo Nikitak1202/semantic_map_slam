@@ -163,24 +163,6 @@
       </link>
     </model>
 
-    <!-- ========== Lamp-and-stand ======================================== -->
-    <model name="lamp">
-      <static>true</static>
-      <pose>-2 -2 0 0 0 1.5708</pose>
-      <link name="link">
-        <collision name="col">
-          <geometry><cylinder><radius>0.15</radius><length>1.4</length></cylinder></geometry>
-        </collision>
-        <visual name="vis">
-          <geometry>
-            <mesh>
-              <uri>https://fuel.ignitionrobotics.org/1.0/openrobotics/models/lampandstand/2/files/meshes/LampAndStand.obj</uri>
-            </mesh>
-          </geometry>
-        </visual>
-      </link>
-    </model>
-
     <!-- ========== Cabinet =============================================== -->
     <model name="cabinet">
       <static>true</static>
