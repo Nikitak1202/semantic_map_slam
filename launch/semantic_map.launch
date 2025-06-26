@@ -24,4 +24,9 @@
     <param name="det_topic"    value="/detections_2d"/>
     <param name="out_topic"    value="/semantic_grid"/>
   </node>
+
+  <node pkg="semantic_map_slam"
+        type="explore_scene.py"
+        name="explore_scene"
+        output="screen"/> 
 </launch>

@@ -64,6 +64,7 @@ target_link_libraries(mecanum ${GAZEBO_LIBRARIES} ${Boost_LIBRARIES})
 catkin_install_python(
   PROGRAMS
     src/semantic_mapper.py    # узел, который красит карту по YOLO
+    src/explore_scene.py
   DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
 )
 

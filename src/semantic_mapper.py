@@ -1,82 +1,80 @@
 #!/usr/bin/env python3
 """
 semantic_mapper.py
-Publish RViz markers at map–frame positions where YOLO (darknet_ros) detects
-objects and merge nearby markers into a single, “confirmed” detection.
+Publishes RViz markers for YOLO detections and fuses nearby ones into
+“confirmed” clusters.
 
-A detection is accepted only if
-  • its bounding–box centre is close enough to the optical axis (CENTER_TOLERANCE)
-  • the corresponding lidar range is finite and shorter than MAX_MAPPING_RANGE
-Supported classes: chair, refrigerator, sofa.
+Standalone (unconfirmed) markers disappear after each clustering cycle.
 """
 
-import math, itertools, collections
+import math, itertools
 from typing import Dict, Set, List
 
 import rospy, tf2_ros, tf2_geometry_msgs, numpy as np
-from std_msgs.msg          import ColorRGBA
-from darknet_ros_msgs.msg  import BoundingBoxes
-from sensor_msgs.msg       import LaserScan, CameraInfo
-from nav_msgs.msg          import OccupancyGrid
-from geometry_msgs.msg     import PointStamped
+from std_msgs.msg           import ColorRGBA
+from darknet_ros_msgs.msg   import BoundingBoxes
+from sensor_msgs.msg        import LaserScan, CameraInfo
+from nav_msgs.msg           import OccupancyGrid
+from geometry_msgs.msg      import PointStamped
 from visualization_msgs.msg import Marker, MarkerArray
 
-# ---------- user-tunable ------------------------------------------------------
-SUPPORTED_CLASSES   = ["chair", "refrigerator", "sofa"]
-CENTER_TOLERANCE    = 0.3          # bbox centre ±20 % of image half-width
-MAX_MAPPING_RANGE   = 6           # ignore detections farther than this [m]
+# ---------- user-tunable -----------------------------------------------------
+SUPPORTED_CLASSES  = ["chair", "refrigerator", "sofa"]
+CENTER_TOLERANCE   = 0.2          # bbox centre ±30 % of image half-width
+MAX_MAPPING_RANGE  = 6          # ignore detections farther than this [m]
 
-CLUSTER_DIST           = 1      # markers ≤ 0.50 m apart belong together
-CLUSTER_PERIOD         = 2        # check clusters every 2 s
-CLUSTER_CONFIRM_ITERS  = 3          # need 3 consecutive checks to collapse
+CLUSTER_DIST          = 1.0       # [m] – markers ≤1 m apart → same cluster
+CLUSTER_PERIOD        = 2.0       # run clustering every 2 s
+CLUSTER_CONFIRM_ITERS = 3         # collapse after 3 consecutive hits
 
-COLORS = { "chair":(0.10,0.80,0.10,0.85),
-           "refrigerator":(0.10,0.10,0.80,0.85),
-           "sofa":(0.80,0.10,0.10,0.85) }
-SIZE_M = { "chair":0.45, "refrigerator":0.60, "sofa":0.75 }
+COLORS = {
+    "chair":        (0.10, 0.80, 0.10, 0.85),
+    "refrigerator": (0.10, 0.10, 0.80, 0.85),
+    "sofa":         (0.80, 0.10, 0.10, 0.85)
+}
+SIZE_M = {"chair": 0.45, "refrigerator": 0.60, "sofa": 0.75}
 
-MARKER_LIFETIME = 0.0               # 0 ⇒ keep forever
+MARKER_LIFETIME = 0.0             # 0 ⇒ keep forever
 CAMERA_FRAME    = "base_front"
-# -----------------------------------------------------------------------------
+# ---------------------------------------------------------------------------
 
 
 class SemanticMapper:
-    # -------------------------------------------------------------------------
     def __init__(self):
         rospy.init_node("semantic_mapper")
 
-        # publishers / subscribers
-        self.pub_markers = rospy.Publisher("semantic_map_markers",
-                                           MarkerArray, queue_size=10, latch=True)
+        # --- I/O ------------------------------------------------------------
+        self.pub_markers = rospy.Publisher(
+            "semantic_map_markers", MarkerArray, queue_size=10, latch=True)
 
         rospy.Subscriber("/darknet_ros/bounding_boxes", BoundingBoxes,
                          self.cb_boxes, queue_size=5)
         rospy.Subscriber("/scan", LaserScan, self.cb_scan, queue_size=5)
-        rospy.Subscriber("/map", OccupancyGrid, self.cb_map, queue_size=1)
+        rospy.Subscriber("/map",  OccupancyGrid, self.cb_map,  queue_size=1)
 
-        # TF listener
+        # TF
         self.tf_buf = tf2_ros.Buffer(rospy.Duration(30))
         tf2_ros.TransformListener(self.tf_buf)
 
-        # state
+        # State
         self.latest_scan = None
         self.map_frame   = "map"
-        self.marker_id   = itertools.count()      # unique IDs
-        self.img_w, self.hfov = 640, math.radians(90)  # until CameraInfo arrives
+        self.marker_id   = itertools.count()
+        self.img_w, self.hfov = 640, math.radians(90)
 
-        # camera info (one-shot)
         rospy.Subscriber("/head/camera/camera_info", CameraInfo,
                          self.cb_caminfo, queue_size=1)
 
-        # ----- NEW: book-keeping for clustering ------------------------------
-        self.records: Dict[int, dict] = {}        # marker-id → info dict
+        # bookkeeping  (id → {class_, pos, confirmed})
+        self.records: Dict[int, dict] = {}
         self.cluster_persist: Dict[frozenset, int] = {}
 
         rospy.Timer(rospy.Duration(CLUSTER_PERIOD), self.timer_cluster)
-
         rospy.loginfo("semantic_mapper ready")
 
-    # -------------------------------------------------------------------------
+    # -----------------------------------------------------------------------
+    # Callbacks
+    # -----------------------------------------------------------------------
     def cb_caminfo(self, msg: CameraInfo):
         self.img_w = msg.width
         fx         = msg.K[0]
@@ -91,156 +89,164 @@ class SemanticMapper:
     def cb_scan(self, msg: LaserScan):
         self.latest_scan = msg
 
-    # -------------------------------------------------------------------------
     def cb_boxes(self, msg: BoundingBoxes):
         if self.latest_scan is None:
             return
 
-        angle_min, angle_inc = self.latest_scan.angle_min, self.latest_scan.angle_increment
-        ranges = self.latest_scan.ranges
-        n_beams = len(ranges)
+        a_min, a_inc = self.latest_scan.angle_min, self.latest_scan.angle_increment
+        ranges       = self.latest_scan.ranges
+        N_beams      = len(ranges)
 
-        m_arr = MarkerArray()
-        stamp_now = rospy.Time.now()
+        m_arr   = MarkerArray()
+        stamp   = rospy.Time.now()
 
         for box in msg.bounding_boxes:
             cls = box.Class.lower()
             if cls not in SUPPORTED_CLASSES:
                 continue
 
-            # centrality gate --------------------------------------------------
+            # centrality gate
             u_mid = 0.5 * (box.xmin + box.xmax)
-            if abs(u_mid - self.img_w/2.0) > CENTER_TOLERANCE * (self.img_w/2.0):
+            if abs(u_mid - self.img_w/2.0) > CENTER_TOLERANCE*(self.img_w/2.0):
                 continue
 
-            # pixel → bearing angle -------------------------------------------
-            theta = ((u_mid - self.img_w/2.0) / self.img_w) * self.hfov
+            # pixel → bearing
+            theta = ((u_mid - self.img_w/2.0)/self.img_w) * self.hfov
 
-            # nearest lidar ray & range ---------------------------------------
-            idx = int(round((theta - angle_min) / angle_inc))
-            if not (0 <= idx < n_beams):
+            # nearest beam
+            idx = int(round((theta - a_min)/a_inc))
+            if not (0 <= idx < N_beams):
                 continue
             rng = ranges[idx]
             if not (math.isfinite(rng) and 0.0 < rng <= MAX_MAPPING_RANGE):
                 continue
 
-            # point in camera frame -------------------------------------------
+            # point in camera frame
             pt_cam = PointStamped()
             pt_cam.header.stamp    = self.latest_scan.header.stamp
             pt_cam.header.frame_id = CAMERA_FRAME
-            pt_cam.point.x = rng * math.cos(theta)
-            pt_cam.point.y = rng * math.sin(theta)
+            pt_cam.point.x = rng*math.cos(theta)
+            pt_cam.point.y = rng*math.sin(theta)
             pt_cam.point.z = 0.0
 
-            # transform → map --------------------------------------------------
+            # transform → map
             try:
                 pt_map = self.tf_buf.transform(pt_cam, self.map_frame,
                                                rospy.Duration(0.2))
-            except (tf2_ros.LookupException,
-                    tf2_ros.ExtrapolationException,
-                    tf2_ros.ConnectivityException):
+            except tf2_ros.TransformException:
                 rospy.logwarn_throttle(
                     2.0, f"TF {self.map_frame}←{CAMERA_FRAME} unavailable")
                 continue
 
-            # marker -----------------------------------------------------------
-            new_marker = self.make_marker(cls, pt_map.point, stamp_now)
-            m_arr.markers.append(new_marker)
+            # create marker
+            m = self.make_marker(cls, pt_map.point, stamp)
+            m_arr.markers.append(m)
 
-            # remember it for clustering
-            self.records[new_marker.id] = dict(
-                class_=cls,
-                pos=np.array([pt_map.point.x, pt_map.point.y, pt_map.point.z])
-            )
+            # store record (unconfirmed)
+            self.records[m.id] = dict(class_=cls,
+                                      pos=np.array([pt_map.point.x,
+                                                    pt_map.point.y,
+                                                    pt_map.point.z]),
+                                      confirmed=False)
 
         if m_arr.markers:
             self.pub_markers.publish(m_arr)
 
-    # -------------------------------------------------------------------------
+    # -----------------------------------------------------------------------
+    # Clustering logic
+    # -----------------------------------------------------------------------
     def timer_cluster(self, _):
-        """Periodically check clusters and collapse persistent ones."""
-        ids   = list(self.records.keys())
-        N     = len(ids)
-        if N < 2:
-            self.cluster_persist.clear()          # nothing to cluster
+        ids = list(self.records.keys())
+        if not ids:        # nothing to do
+            self.cluster_persist.clear()
             return
 
-        # ---- build distance matrix & breadth-first grouping -----------------
+        # build clusters -----------------------------------------------------
         positions = np.array([self.records[i]["pos"] for i in ids])
+        unvis = set(range(len(ids)))
         clusters: List[Set[int]] = []
-        unvisited: Set[int] = set(range(N))       # indices in 'ids' list
 
-        while unvisited:
-            root = unvisited.pop()
+        while unvis:
+            root = unvis.pop()
             stack = [root]
-            cluster = {root}
+            cl_idx = {root}
             while stack:
                 i = stack.pop()
-                # find neighbours of 'i' inside threshold
-                dists = np.linalg.norm(positions[list(unvisited)] - positions[i], axis=1)
-                neighbours = [j for j, d in zip(list(unvisited), dists) if d <= CLUSTER_DIST]
-                for j in neighbours:
-                    unvisited.remove(j)
+                d = np.linalg.norm(positions[list(unvis)] - positions[i], axis=1)
+                neigh = [j for j, dist in zip(list(unvis), d) if dist <= CLUSTER_DIST]
+                for j in neigh:
+                    unvis.remove(j)
                     stack.append(j)
-                    cluster.add(j)
-            clusters.append({ids[k] for k in cluster})   # convert to real marker IDs
+                    cl_idx.add(j)
+            clusters.append({ids[k] for k in cl_idx})
 
-        # ---- update persistence counters & collapse if due ------------------
-        new_persist = {}
+        # process clusters ---------------------------------------------------
+        new_persist: Dict[frozenset, int] = {}
         for cl in clusters:
-            if len(cl) == 1:                 # singleton → no clustering
-                continue
-            key = frozenset(cl)
-            cnt = self.cluster_persist.get(key, 0) + 1
-            if cnt >= CLUSTER_CONFIRM_ITERS:
-                self.collapse_cluster(cl)    # replaces markers
-            else:
-                new_persist[key] = cnt       # keep counting
+            if len(cl) > 1:                                # multi-element
+                key = frozenset(cl)
+                cnt = self.cluster_persist.get(key, 0) + 1
+                if cnt >= CLUSTER_CONFIRM_ITERS:
+                    self.collapse_cluster(cl)
+                else:
+                    new_persist[key] = cnt
+        self.cluster_persist = new_persist
 
-        self.cluster_persist = new_persist   # forget vanishing clusters
+        # delete unconfirmed singletons -------------------------------------
+        del_arr = MarkerArray()
+        for cl in clusters:
+            if len(cl) == 1:
+                mid = next(iter(cl))
+                rec = self.records.get(mid)
+                if rec and not rec["confirmed"]:
+                    m_del = Marker()
+                    m_del.header.frame_id = self.map_frame
+                    m_del.header.stamp    = rospy.Time.now()
+                    m_del.ns   = rec["class_"]
+                    m_del.id   = mid
+                    m_del.action = Marker.DELETE
+                    del_arr.markers.append(m_del)
+                    del self.records[mid]          # drop record
+        if del_arr.markers:
+            self.pub_markers.publish(del_arr)
 
-    # -------------------------------------------------------------------------
     def collapse_cluster(self, ids: Set[int]):
-        """Replace all markers in *ids* with one averaged marker."""
-        # gather classes & positions
-        classes = [self.records[i]["class_"] for i in ids]
-        positions = np.array([self.records[i]["pos"] for i in ids])
+        # gather info
+        classes   = [self.records[i]["class_"] for i in ids]
+        positions = np.array([self.records[i]["pos"]   for i in ids])
+        centroid  = positions.mean(axis=0)
+        majority  = max(classes, key=classes.count)
 
-        centroid = positions.mean(axis=0)
-        # majority class
-        majority = max(classes, key=classes.count)
-
-        # delete old markers --------------------------------------------------
-        delete_arr = MarkerArray()
+        # delete originals
+        del_arr = MarkerArray()
         for mid in ids:
             old_cls = self.records[mid]["class_"]
-            del self.records[mid]            # remove from records
-
             m_del = Marker()
             m_del.header.frame_id = self.map_frame
             m_del.header.stamp    = rospy.Time.now()
-            m_del.ns  = old_cls
-            m_del.id  = mid
+            m_del.ns   = old_cls
+            m_del.id   = mid
             m_del.action = Marker.DELETE
-            delete_arr.markers.append(m_del)
+            del_arr.markers.append(m_del)
+            del self.records[mid]
+        if del_arr.markers:
+            self.pub_markers.publish(del_arr)
 
-        # publish deletions in one shot
-        if delete_arr.markers:
-            self.pub_markers.publish(delete_arr)
-
-        # add averaged marker -------------------------------------------------
+        # add averaged “confirmed” marker
         pt = PointStamped()
         pt.point.x, pt.point.y, pt.point.z = centroid
-        new_marker = self.make_marker(majority, pt.point, rospy.Time.now())
+        new_m = self.make_marker(majority, pt.point, rospy.Time.now())
 
-        add_arr = MarkerArray();
-        add_arr.markers.append(new_marker)
+        add_arr = MarkerArray(markers=[new_m])
         self.pub_markers.publish(add_arr)
 
-        # remember new marker
-        self.records[new_marker.id] = dict(class_=majority, pos=centroid)
+        self.records[new_m.id] = dict(class_=majority,
+                                      pos=centroid,
+                                      confirmed=True)
 
-    # -------------------------------------------------------------------------
+    # -----------------------------------------------------------------------
+    # Helper
+    # -----------------------------------------------------------------------
     def make_marker(self, cls_name, pt_map, stamp):
         m = Marker()
         m.header.frame_id = self.map_frame
@@ -255,9 +261,9 @@ class SemanticMapper:
         m.pose.position.z = pt_map.z
         m.pose.orientation.w = 1.0
 
-        r,g,b,a = COLORS.get(cls_name, (1,1,0,0.9))
-        m.color = ColorRGBA(r,g,b,a)
-        s = SIZE_M.get(cls_name, 0.4)
+        r, g, b, a = COLORS.get(cls_name, (1, 1, 0, 0.9))
+        m.color = ColorRGBA(r, g, b, a)
+        s       = SIZE_M.get(cls_name, 0.4)
         m.scale.x = m.scale.y = m.scale.z = s
         m.lifetime = rospy.Duration(MARKER_LIFETIME)
         return m

@@ -25,6 +25,7 @@
   <depend>cv_bridge</depend>
   <depend>image_transport</depend>
   <depend>sensor_msgs</depend>
+  <depend>tf</depend>   <!-- only for tf.transformations -->
 
   <build_depend>rospy</build_depend>
   <build_export_depend>rospy</build_export_depend>
