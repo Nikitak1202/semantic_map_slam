@@ -42,14 +42,22 @@ sudo apt install ros-noetic-desktop-full \
                  python3-rosdep git
 sudo rosdep init
 rosdep update
+```
 
 ### 3.2 Create a catkin workspace
 ```bash
 mkdir -p ~/catkin_ws/src
 cd ~/catkin_ws/src
+git clone https://github.com/leggedrobotics/darknet_ros.git
 git clone https://github.com/Nikitak1202/semantic_map_slam.git
 cd ..
 rosdep install --from-paths src --ignore-src -r -y
 catkin build
 echo "source ~/catkin_ws/devel/setup.bash" >> ~/.bashrc
 source ~/.bashrc
+```
+
+### 3.3 Run the simulation
+```bash
+roslaunch semantic_map_slam slam.launch gazebo_gui:=true rviz_gui:=true
+```
