@@ -1,50 +1,42 @@
-# Semantic Map SLAM Project
+# Semantic-Map-SLAM Demo Scene  
 
-## What is it?
+## 1. What is it?
+This repo is a **Gazebo + ROS** scene with a small service robot.  
+The robot can:
 
-This project simulates a mobile robot equipped with a Mecanum drive, RGB camera, and lidar. The robot builds a semantic map using YOLO object detection, SLAM (Hector Mapping), and navigates autonomously within a room environment using global path planning (A\*) and a local fallback planner.
+* drive with 4 mecanum wheels (holonomic base);
+* build a 2-D map with **Hector SLAM**;
+* find objects with **YOLO v2-tiny** and add them as colored cubes;
+* plan a path (A*). If no path exists, it rolls to the nearest border;
+* visit every zone of the room.
 
-Key features:
+Everything runs on **ROS Noetic** (Ubuntu 20.04) and **Gazebo 11**.
 
-* **ROS-based robot simulation** in Gazebo
-* **Semantic mapping**: object detection with YOLO
-* **Navigation**: Autonomous zone exploration using A\* and local fallback
+---
 
-## Demo
+## 2. Demo  
 
-Watch the demo video [here](./demo.mp4).
+<video src="demo.mp4" controls width="720"></video>  
 
-## How to install
+The video will start when you click ▶.
 
-### Step 1: Dependencies
+---
 
-Install ROS Noetic and Gazebo 11:
+## 3. How to install
+
+> Tested on Ubuntu 20.04 + ROS Noetic.
+
+### 3.1 System packages  
 
 ```bash
 sudo apt update
-sudo apt install ros-noetic-desktop-full ros-noetic-gazebo-ros-control ros-noetic-hector-slam ros-noetic-darknet-ros ros-noetic-controller-manager
-```
-
-### Step 2: Prepare workspace
-
-Create and build the ROS workspace:
-
-```bash
-mkdir -p ~/catkin_ws/src
-cd ~/catkin_ws/src
-git clone <this-repo-url>
-cd ~/catkin_ws
-rosdep install --from-paths src --ignore-src -r -y
-catkin_make
-source devel/setup.bash
-```
-
-### Step 3: Run simulation
-
-Start simulation with RViz and Gazebo:
-
-```bash
-roslaunch semantic_map_slam main.launch
-```
-
-Your environment is ready! Now the robot will autonomously explore the room, build a semantic map, and classify detected objects.
+sudo apt install ros-noetic-desktop-full \
+                 ros-noetic-gazebo-ros-pkgs \
+                 ros-noetic-gazebo-ros-control \
+                 ros-noetic-hector-mapping \
+                 ros-noetic-tf2-ros \
+                 ros-noetic-vision-msgs \
+                 python3-catkin-tools \
+                 python3-rosdep git
+sudo rosdep init
+rosdep update
