@@ -59,5 +59,5 @@ source ~/.bashrc
 
 ### 3.3 Run the simulation
 ```bash
-roslaunch semantic_map_slam slam.launch gazebo_gui:=true rviz_gui:=true
+roslaunch semantic_map_slam slam.launch gazebo_gui:=false rviz_gui:=true
 ```
