@@ -44,7 +44,7 @@ sudo rosdep init
 rosdep update
 ```
 
-### 3.2 Create a catkin workspace
+### 3.2 Create a catkin workspace and clone repos
 ```bash
 mkdir -p ~/catkin_ws/src
 cd ~/catkin_ws/src
