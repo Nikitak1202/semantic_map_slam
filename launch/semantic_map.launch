@@ -25,6 +25,7 @@
     <param name="out_topic"    value="/semantic_grid"/>
   </node>
 
+  <!-- === Run autonomous drive node ============================ -->
   <node pkg="semantic_map_slam"
         type="explore_scene.py"
         name="explore_scene"

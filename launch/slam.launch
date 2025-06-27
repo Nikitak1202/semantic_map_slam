@@ -2,8 +2,8 @@
 <launch>
 
   <!-- GUI configuration: enable/disable Gazebo and RViz -->
-  <arg name="gazebo_gui" default="false"/>
-  <arg name="rviz_gui"   default="true"/>
+  <arg name="gazebo_gui" default="  true"/>
+  <arg name="rviz_gui"   default="false"/>
   
   <!-- Load robot description -->
   <param name="robot_description"

@@ -25,80 +25,67 @@
       <uri>model://ground_plane</uri>
     </include>
 
-    <!-- ══════════════════════════════════════════════════════════════════ -->
-    <!-- WALLS                                                              --> 
-    <!-- ══════════════════════════════════════════════════════════════════ -->
-    <!-- North -->
+
+    <!-- North wall -->
     <model name="wall_north">
       <static>true</static>
-      <pose>0 5 0.5 0 0 0</pose>
+      <pose>0 5.0 0.5  0 0 0</pose>
       <link name="link">
         <collision name="col">
-          <geometry><box><size>10 0.2 1</size></box></geometry>
+          <geometry><box><size>9.8 0.2 1</size></box></geometry>
         </collision>
         <visual name="vis">
-          <geometry><box><size>10 0.2 1</size></box></geometry>
-          <material>
-            <ambient>0.2 0.6 0.8 1</ambient>
-            <diffuse>0.2 0.6 0.8 1</diffuse>
-          </material>
+          <geometry><box><size>9.8 0.2 1</size></box></geometry>
+          <material><ambient>0.2 0.6 0.8 1</ambient></material>
         </visual>
       </link>
     </model>
 
-    <!-- South -->
+    <!-- South wall -->
     <model name="wall_south">
       <static>true</static>
-      <pose>0 -5 0.5 0 0 0</pose>
+      <pose>0 -5.1 0.5  0 0 0</pose>         
       <link name="link">
         <collision name="col">
-          <geometry><box><size>10 0.2 1</size></box></geometry>
+          <geometry><box><size>9.8 0.2 1</size></box></geometry>
         </collision>
         <visual name="vis">
-          <geometry><box><size>10 0.2 1</size></box></geometry>
-          <material>
-            <ambient>0.2 0.6 0.8 1</ambient>
-            <diffuse>0.2 0.6 0.8 1</diffuse>
-          </material>
+          <geometry><box><size>9.8 0.2 1</size></box></geometry>
+          <material><ambient>0.2 0.6 0.8 1</ambient></material>
         </visual>
       </link>
     </model>
 
-    <!-- East -->
+    <!-- East wall -->
     <model name="wall_east">
       <static>true</static>
-      <pose>5 0 0.5 0 0 1.5708</pose>
+      <pose>5.1 0 0.5  0 0 1.5708</pose>       
       <link name="link">
         <collision name="col">
-          <geometry><box><size>10 0.2 1</size></box></geometry>
+          <geometry><box><size>9.8 0.2 1</size></box></geometry>
         </collision>
         <visual name="vis">
-          <geometry><box><size>10 0.2 1</size></box></geometry>
-          <material>
-            <ambient>0.2 0.6 0.8 1</ambient>
-            <diffuse>0.2 0.6 0.8 1</diffuse>
-          </material>
+          <geometry><box><size>9.8 0.2 1</size></box></geometry>
+          <material><ambient>0.2 0.6 0.8 1</ambient></material>
         </visual>
       </link>
     </model>
 
-    <!-- West -->
+    <!-- West wall -->
     <model name="wall_west">
       <static>true</static>
-      <pose>-5 0 0.5 0 0 1.5708</pose>
+      <pose>-5.1 0 0.5  0 0 1.5708</pose>      
       <link name="link">
         <collision name="col">
-          <geometry><box><size>10 0.2 1</size></box></geometry>
+          <geometry><box><size>9.8 0.2 1</size></box></geometry>
         </collision>
         <visual name="vis">
-          <geometry><box><size>10 0.2 1</size></box></geometry>
-          <material>
-            <ambient>0.2 0.6 0.8 1</ambient>
-            <diffuse>0.2 0.6 0.8 1</diffuse>
-          </material>
+          <geometry><box><size>9.8 0.2 1</size></box></geometry>
+          <material><ambient>0.2 0.6 0.8 1</ambient></material>
         </visual>
       </link>
     </model>
+
 
     <!-- ========== Sofa =================================================== -->
     <model name="sofa">
@@ -118,18 +105,36 @@
       </link>
     </model>
 
-    <!-- ========== Refrigerator ====================== -->
+    <!-- ========== Refrigerator 1 =================================================== -->
+    <model name="sofa2">
+      <static>true</static>
+      <pose>4 4 0 0 0 -1.57</pose>
+      <link name="link">
+        <collision name="col">
+          <geometry><box><size>2.0 0.8 0.7</size></box></geometry>
+        </collision>
+        <visual name="vis">
+          <geometry>
+            <mesh>
+              <uri>https://fuel.ignitionrobotics.org/1.0/openrobotics/models/sofa/2/files/meshes/Sofa.obj</uri>
+            </mesh>
+          </geometry>
+        </visual>
+      </link>
+    </model>
+
+    <!-- ========== Refrigerator 2 ====================== -->
     <include>
       <uri>https://fuel.gazebosim.org/1.0/openrobotics/models/Refrigerator</uri>
       <name>refrigerator</name>
-      <pose>-4 4 0 0 0 0</pose>
+      <pose>-4.2 4 0 0 0 -0.75</pose>
       <static>true</static>
     </include>
 
     <!-- ========== Mini-sofa ============================================= -->
     <model name="mini_sofa">
       <static>true</static>
-      <pose>-2 0.2 0 0 0 -1.5708</pose>
+      <pose>-2 0.2 0 0 0 0</pose>
       <link name="link">
         <collision name="col">
           <geometry><box><size>1.4 0.6 0.6</size></box></geometry>
@@ -180,6 +185,5 @@
         </visual>
       </link>
     </model>
-
   </world>
 </sdf>

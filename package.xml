@@ -2,9 +2,9 @@
 <package format="2">
   <version>1.0.0</version>
   <name>semantic_map_slam</name>
-  <description>Simulation scene for yandex.ru/profi contest. Demo scene</description>
+  <description>Semantic mapping fused with Hector SLAM</description>
 
-  <maintainer email="superuser@todo.todo">superuser</maintainer>
+  <maintainer email="Nikitak1202@yandex.ru">superuser</maintainer>
 
   <license>TODO</license>
 
@@ -25,7 +25,7 @@
   <depend>cv_bridge</depend>
   <depend>image_transport</depend>
   <depend>sensor_msgs</depend>
-  <depend>tf</depend>   <!-- only for tf.transformations -->
+  <depend>tf</depend>   
 
   <build_depend>rospy</build_depend>
   <build_export_depend>rospy</build_export_depend>
