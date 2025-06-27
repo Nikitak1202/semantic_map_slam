@@ -24,7 +24,7 @@ https://github.com/user-attachments/assets/5d64fcbe-e0e2-4c32-a0f7-a742b85c9154
 
 ---
 
-## 3. How to install
+## 3. How to run
 
 > Tested on Ubuntu 20.04 + ROS Noetic.
 
