@@ -16,9 +16,11 @@ Everything runs on **ROS Noetic** (Ubuntu 20.04) and **Gazebo 11**.
 
 ## 2. Demo  
 
-<video src="1751023019695824.mp4" controls width="720"></video>  
 
-The video will start when you click ▶.
+
+https://github.com/user-attachments/assets/5d64fcbe-e0e2-4c32-a0f7-a742b85c9154
+
+
 
 ---
 
@@ -40,3 +42,14 @@ sudo apt install ros-noetic-desktop-full \
                  python3-rosdep git
 sudo rosdep init
 rosdep update
+
+### 3.2 Create a catkin workspace
+```bash
+mkdir -p ~/catkin_ws/src
+cd ~/catkin_ws/src
+git clone https://github.com/Nikitak1202/semantic_map_slam.git
+cd ..
+rosdep install --from-paths src --ignore-src -r -y
+catkin build
+echo "source ~/catkin_ws/devel/setup.bash" >> ~/.bashrc
+source ~/.bashrc
