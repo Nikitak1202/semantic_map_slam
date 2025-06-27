@@ -20,7 +20,7 @@ Everything runs on **ROS Noetic** (Ubuntu 20.04) and **Gazebo 11**.
 
 https://github.com/user-attachments/assets/5d64fcbe-e0e2-4c32-a0f7-a742b85c9154
 
-
+Full version is here: https://www.youtube.com/watch?v=DFvytUgX27Q&t=28s
 
 ---
 
